@@ -1,7 +1,81 @@
 ---
-- hosts: localhost
+- name: Create Jenkins Deployment
+  hosts: localhost
+  gather_facts: no
+  vars:
+    kubernetes_config: "/home/codespace/.kube/config"
+    namespace: "default"  # Ensure the namespace is specified
   tasks:
-  - name: "Install kubernetes python package"
-    pip:
-      name: kubernetes
-      state: present
+    - name: Create Jenkins Deployment
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubernetes_config }}"
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: jenkins-deployment
+            namespace: "{{ namespace }}"
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: jenkins
+            template:
+              metadata:
+                labels:
+                  app: jenkins
+              spec:
+                containers:
+                  - name: jenkins
+                    image: jenkins/jenkins:lts
+                    ports:
+                      - containerPort: 8080
+                    volumeMounts:
+                      - name: jenkins-home
+                        mountPath: /var/jenkins_home
+                volumes:
+                  - name: jenkins-home
+                    emptyDir: {}
+
+    - name: Create Jenkins Service
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubernetes_config }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: jenkins-service
+            namespace: "{{ namespace }}"
+          spec:
+            ports:
+              - port: 8080
+            selector:
+              app: jenkins
+
+    - name: Create Jenkins Ingress
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubernetes_config }}"
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: jenkins-ingress
+            namespace: "{{ namespace }}"
+            annotations:
+              nginx.ingress.kubernetes.io/rewrite-target: /
+              nginx.ingress.kubernetes.io/ingress.class: "ngrok"  # ngrok ingress class
+          spec:
+            rules:
+              - host: jenkins.ngrok.io  # Ensure this resolves via ngrok
+                http:
+                  paths:
+                    - path: /
+                      pathType: Prefix
+                      backend:
+                        service:
+                          name: jenkins-service
+                          port:
+                            number: 8080

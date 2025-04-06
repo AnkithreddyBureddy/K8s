@@ -1,7 +1,40 @@
 ---
-- hosts: localhost
+- name: Remove Jenkins Deployment
+  hosts: localhost
+  gather_facts: no
+  vars:
+    kubernetes_config: "/home/codespace/.kube/config"
+    namespace: "default"
   tasks:
-  - name: "remove kubernetes python package"
-    pip:
-      name: kubernetes
-      state: absent
+    - name: Delete Jenkins Deployment
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubernetes_config }}"
+        state: absent
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: jenkins-deployment
+            namespace: "{{ namespace }}"
+
+    - name: Delete Jenkins Service
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubernetes_config }}"
+        state: absent
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: jenkins-service
+            namespace: "{{ namespace }}"
+
+    - name: Delete Jenkins Ingress
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubernetes_config }}"
+        state: absent
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: jenkins-ingress
+            namespace: "{{ namespace }}"
